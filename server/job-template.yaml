@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: test-job-{{REPO_NAME}}
+spec:
+  template:
+    spec:
+      containers:
+      - name: test-container
+        image: node:18
+        command: ["/bin/sh", "-c"]
+        args:
+          - cd /app && npm install && npm test
+        volumeMounts:
+        - name: repo-volume
+          mountPath: /app
+      restartPolicy: Never
+      volumes:
+      - name: repo-volume
+        hostPath:
+          path: {{REPO_PATH}}
+  backoffLimit: 0

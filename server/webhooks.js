@@ -1,18 +1,20 @@
 const express = require("express");
 const router = express.Router();
+const runTests = require("./createK8sJobs");
 
-router.post("/", (req, res) => {
+router.post("/", async (req, res) => {
   const payload = req.body;
-
-  console.log(payload);
-
   const repoUrl = payload?.repository?.clone_url;
-  const latestCommit = payload?.head_commit?.message;
+  const repoName = payload?.repository?.name;
 
-  console.log("repo URL : ", repoUrl);
-  console.log("latest Commit : ", latestCommit);
+  if (!repoUrl || !repoName) {
+    return res.status(400).send("Missing repo data");
+  }
 
-  res.status(200).send("Webhook received");
+  console.log(`🔔 Webhook from ${repoName}`);
+
+  await runTests(repoUrl, repoName);
+  res.status(200).send("Test job started!");
 });
 
 module.exports = router;
