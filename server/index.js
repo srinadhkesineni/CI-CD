@@ -3,9 +3,34 @@ const express = require('express');
 const cloneRepo = require('./cloneRepo');
 const buildDockerImage = require('./buildDockerImage');
 const createK8sJob = require('./createK8sJob');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 app.use(express.json());
+
+
+app.get('/repos', (req, res) => {
+  const reposDir = path.join(__dirname, '../repos');
+
+  fs.readdir(reposDir, (err, folders) => {
+    if (err) {
+      console.error('❌ Error reading repos folder:', err);
+      return res.status(500).json({ error: 'Failed to read repos' });
+    }
+
+    const repoData = folders.map(folder => ({
+      name: folder,
+      commit: 'N/A',              // Replace if you store commit info
+      status: 'Unknown',          // Replace if you track build status
+      logsLink: `/logs/${folder}`
+    }));
+
+    res.json(repoData);
+  });
+});
+
+
 
 app.post('/webhook', async (req, res) => {
   const repoUrl = req.body.repository.clone_url;
