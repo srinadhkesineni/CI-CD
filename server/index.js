@@ -5,13 +5,16 @@ const buildDockerImage = require('./buildDockerImage');
 const createK8sJob = require('./createK8sJob');
 const fs = require('fs');
 const path = require('path');
+const cors = require('cors');
 
 const app = express();
 app.use(express.json());
+app.use(cors()); 
+
 
 
 app.get('/repos', (req, res) => {
-  const reposDir = path.join(__dirname, '../repos');
+  const reposDir = path.resolve(__dirname, '../repos');
 
   fs.readdir(reposDir, (err, folders) => {
     if (err) {
@@ -49,6 +52,6 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-app.listen(3000, () => {
+app.listen(8080, () => {
   console.log('🚀 Server listening on port 3000');
 });

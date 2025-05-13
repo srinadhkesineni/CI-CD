@@ -9,10 +9,9 @@ export default function Dashboard() {
     fetchRepos()
       .then(setRepos)
       .catch(err => console.error("Error fetching repos:", err));
-  }, []);
-
-  return (
-    <div className="dashboard-container">
+    }, []);
+    return (
+      <div className="dashboard-container">
       <h1>📦 Student Builds Dashboard</h1>
       <div className="repo-grid">
         {repos.map((repo, idx) => (
