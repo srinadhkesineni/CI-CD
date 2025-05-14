@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchRepos } from '../api';
-import RepoCard from '../compoenents/RepoCard';
+import RepoCard from '../components/RepoCard';
 
 export default function Dashboard() {
   const [repos, setRepos] = useState([]);

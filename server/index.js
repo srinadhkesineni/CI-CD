@@ -33,6 +33,19 @@ app.get('/repos', (req, res) => {
   });
 });
 
+app.get('/logs/:repoName', (req, res) => {
+  const repoName = req.params.repoName;
+  const logPath = path.join(__dirname, '../logs', `${repoName}.log`);
+
+  fs.readFile(logPath, 'utf8', (err, data) => {
+    if (err) {
+      console.error(`❌ Log not found for ${repoName}`);
+      return res.status(404).json({ error: 'Logs not found' });
+    }
+
+    res.json({ logs: data });
+  });
+});
 
 
 app.post('/webhook', async (req, res) => {

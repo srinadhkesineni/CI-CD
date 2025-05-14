@@ -28,15 +28,29 @@ async function buildDockerImage(repoPath, repoName) {
         console.log(`🚀 Container started: ${containerId}`);
         
         // Start streaming logs
-        exec(`docker logs -f ${containerId}`, (err, logs) => {
-          if (err) {
-            console.error(`❌ Error streaming logs:`, stderr);
-            reject(err);
-            return;
-          }
-          console.log(`🚨 Logs streaming from Docker container:`);
-          console.log(logs);
-        });
+        // exec(`docker logs -f ${containerId}`, (err, logs) => {
+        //   if (err) {
+        //     console.error(`❌ Error streaming logs:`, stderr);
+        //     reject(err);
+        //     return;
+        //   }
+        //   console.log(`🚨 Logs streaming from Docker container:`);
+        //   console.log(logs);
+        // });
+
+        const logsDir = path.join(__dirname, '../logs');
+        if (!fs.existsSync(logsDir)) {
+          fs.mkdirSync(logsDir);
+        }
+
+        const logPath = path.join(logsDir, `${repoName}.log`);
+        const logStream = fs.createWriteStream(logPath, { flags: 'w' });
+
+        const dockerLogsCmd = `docker logs -f ${containerId}`;
+        const logsProcess = exec(dockerLogsCmd);
+
+        logsProcess.stdout.pipe(logStream);
+        logsProcess.stderr.pipe(logStream);
         
         resolve(imageName);
       });
