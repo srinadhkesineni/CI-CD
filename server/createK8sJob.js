@@ -55,7 +55,8 @@ async function createK8sJob(imageName, jobName) {
       });
     });
   } catch (err) {
-    console.error(`❌ Failed to create Kubernetes job:`, err.body.message);
+    const errorMessage = err?.body?.message || err.message || String(err);
+    console.error(`❌ Failed to create Kubernetes job:`, errorMessage);
   }
 }
 

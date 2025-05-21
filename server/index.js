@@ -1,5 +1,4 @@
 const express = require('express');
-// const bodyParser = require('body-parser');
 const cloneRepo = require('./cloneRepo');
 const buildDockerImage = require('./buildDockerImage');
 const createK8sJob = require('./createK8sJob');
@@ -11,7 +10,11 @@ const app = express();
 app.use(express.json());
 app.use(cors()); 
 
-
+// ✅ Ensure logs folder exists at startup
+const logsDir = path.resolve(__dirname, '../logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir);
+}
 
 app.get('/repos', (req, res) => {
   const reposDir = path.resolve(__dirname, '../repos');
@@ -24,8 +27,8 @@ app.get('/repos', (req, res) => {
 
     const repoData = folders.map(folder => ({
       name: folder,
-      commit: 'N/A',              // Replace if you store commit info
-      status: 'Unknown',          // Replace if you track build status
+      commit: 'N/A',
+      status: 'Unknown',
       logsLink: `/logs/${folder}`
     }));
 
@@ -35,18 +38,17 @@ app.get('/repos', (req, res) => {
 
 app.get('/logs/:repoName', (req, res) => {
   const repoName = req.params.repoName;
-  const logPath = path.join(__dirname, '../logs', `${repoName}.log`);
+  const logPath = path.join(logsDir, `${repoName}.log`);
 
   fs.readFile(logPath, 'utf8', (err, data) => {
     if (err) {
       console.error(`❌ Log not found for ${repoName}`);
       return res.status(404).json({ error: 'Logs not found' });
     }
-
-    res.json({ logs: data });
+    // console.log(data)
+    res.type('text/plain').send(data);
   });
 });
-
 
 app.post('/webhook', async (req, res) => {
   const repoUrl = req.body.repository.clone_url;
@@ -56,7 +58,7 @@ app.post('/webhook', async (req, res) => {
   try {
     const repoPath = await cloneRepo(repoUrl, repoName);
     const imageName = await buildDockerImage(repoPath, repoName);
-    await createK8sJob(imageName, jobName);
+    // await createK8sJob(imageName, jobName);
 
     res.status(200).send('✅ Test job created successfully!');
   } catch (error) {

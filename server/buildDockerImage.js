@@ -1,4 +1,6 @@
 const { exec } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
 async function buildDockerImage(repoPath, repoName) {
   const imageName = `student-${repoName.toLowerCase()}`;
@@ -26,17 +28,6 @@ async function buildDockerImage(repoPath, repoName) {
         
         const containerId = stdout.trim();
         console.log(`🚀 Container started: ${containerId}`);
-        
-        // Start streaming logs
-        // exec(`docker logs -f ${containerId}`, (err, logs) => {
-        //   if (err) {
-        //     console.error(`❌ Error streaming logs:`, stderr);
-        //     reject(err);
-        //     return;
-        //   }
-        //   console.log(`🚨 Logs streaming from Docker container:`);
-        //   console.log(logs);
-        // });
 
         const logsDir = path.join(__dirname, '../logs');
         if (!fs.existsSync(logsDir)) {
