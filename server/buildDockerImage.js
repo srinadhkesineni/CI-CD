@@ -1,49 +1,72 @@
 const { exec } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+const Log = require('./models/Logs');
 
 async function buildDockerImage(repoPath, repoName) {
   const imageName = `student-${repoName.toLowerCase()}`;
   const dockerBuildCmd = `docker build -t ${imageName} ${repoPath}`;
 
   console.log(`🐳 Building Docker image: ${imageName}`);
-  
+
   return new Promise((resolve, reject) => {
     exec(dockerBuildCmd, (err, stdout, stderr) => {
       if (err) {
         console.error(`❌ Docker build error:`, stderr);
-        reject(err);
-        return;
+        const failedLog = new Log({
+          repoName,
+          status: 'Failed',
+          logContent: stderr.toString()
+        });
+        failedLog.save();
+        return reject(err);
       }
+
       console.log(`✅ Docker build successful:\n${stdout}`);
-      
-      // Now run the container and stream logs
+
       const dockerRunCmd = `docker run -d ${imageName}`;
-      exec(dockerRunCmd, (err, stdout) => {
+      exec(dockerRunCmd, (err, stdout, stderr) => {
         if (err) {
           console.error(`❌ Error running container:`, stderr);
-          reject(err);
-          return;
+          const failedLog = new Log({
+            repoName,
+            status: 'Failed',
+            logContent: stderr.toString()
+          });
+          failedLog.save();
+          return reject(err);
         }
-        
+
         const containerId = stdout.trim();
         console.log(`🚀 Container started: ${containerId}`);
-
-        const logsDir = path.join(__dirname, '../logs');
-        if (!fs.existsSync(logsDir)) {
-          fs.mkdirSync(logsDir);
-        }
-
-        const logPath = path.join(logsDir, `${repoName}.log`);
-        const logStream = fs.createWriteStream(logPath, { flags: 'w' });
 
         const dockerLogsCmd = `docker logs -f ${containerId}`;
         const logsProcess = exec(dockerLogsCmd);
 
-        logsProcess.stdout.pipe(logStream);
-        logsProcess.stderr.pipe(logStream);
-        
-        resolve(imageName);
+        let collectedLogs = '';
+
+        logsProcess.stdout.on('data', (chunk) => {
+          collectedLogs += chunk.toString();
+        });
+
+        logsProcess.stderr.on('data', (chunk) => {
+          collectedLogs += chunk.toString();
+        });
+
+        logsProcess.on('close', async () => {
+          const successLog = new Log({
+            repoName,
+            status: 'Success',
+            logContent: collectedLogs
+          });
+
+          try {
+            await successLog.save();
+            console.log(`📦 Logs saved to database for ${repoName}`);
+          } catch (dbErr) {
+            console.error('❌ Failed to save logs to DB:', dbErr);
+          }
+
+          resolve(imageName);
+        });
       });
     });
   });
