@@ -7,31 +7,36 @@ async function buildDockerImage(repoPath, repoName) {
 
   console.log(`🐳 Building Docker image: ${imageName}`);
 
+  // Helper to log each stage
+  async function logStage(stage, command, error, stdout, stderr) {
+    const logEntry = new Log({
+      repoName,
+      stage,
+      command,
+      status: error ? 'Failed' : 'Passed',
+      logContent: stdout || stderr,
+      timestamp: new Date()
+    });
+    await logEntry.save();
+  }
+
   return new Promise((resolve, reject) => {
-    exec(dockerBuildCmd, (err, stdout, stderr) => {
+    exec(dockerBuildCmd, async (err, stdout, stderr) => {
+      await logStage("docker build", dockerBuildCmd, err, stdout, stderr);
+
       if (err) {
-        console.error(`❌ Docker build error:`, stderr);
-        const failedLog = new Log({
-          repoName,
-          status: 'Failed',
-          logContent: stderr.toString()
-        });
-        failedLog.save();
+        console.error(`❌ Docker build error:\n`, stderr);
         return reject(err);
       }
 
       console.log(`✅ Docker build successful:\n${stdout}`);
 
       const dockerRunCmd = `docker run -d ${imageName}`;
-      exec(dockerRunCmd, (err, stdout, stderr) => {
+      exec(dockerRunCmd, async (err, stdout, stderr) => {
+        await logStage("docker run", dockerRunCmd, err, stdout, stderr);
+
         if (err) {
-          console.error(`❌ Error running container:`, stderr);
-          const failedLog = new Log({
-            repoName,
-            status: 'Failed',
-            logContent: stderr.toString()
-          });
-          failedLog.save();
+          console.error(`❌ Error running container:\n`, stderr);
           return reject(err);
         }
 
@@ -52,19 +57,8 @@ async function buildDockerImage(repoPath, repoName) {
         });
 
         logsProcess.on('close', async () => {
-          const successLog = new Log({
-            repoName,
-            status: 'Success',
-            logContent: collectedLogs
-          });
-
-          try {
-            await successLog.save();
-            console.log(`📦 Logs saved to database for ${repoName}`);
-          } catch (dbErr) {
-            console.error('❌ Failed to save logs to DB:', dbErr);
-          }
-
+          await logStage("container logs", dockerLogsCmd, null, collectedLogs, null);
+          console.log(`📦 Logs saved to database for ${repoName}`);
           resolve(imageName);
         });
       });
