@@ -1,47 +1,46 @@
 const { exec } = require('child_process');
 const Log = require('./models/Logs');
+const { io } = require('./socket'); // import socket instance
 
 async function buildDockerImage(repoPath, repoName) {
   const imageName = `student-${repoName.toLowerCase()}`;
   const dockerBuildCmd = `docker build -t ${imageName} ${repoPath}`;
 
-  console.log(`🐳 Building Docker image: ${imageName}`);
-
-  // Helper to log each stage
-  async function logStage(stage, command, error, stdout, stderr) {
-    const logEntry = new Log({
-      repoName,
-      stage,
-      command,
-      status: error ? 'Failed' : 'Passed',
-      logContent: stdout || stderr,
-      timestamp: new Date()
-    });
-    await logEntry.save();
-  }
-
   return new Promise((resolve, reject) => {
-    exec(dockerBuildCmd, async (err, stdout, stderr) => {
-      await logStage("docker build", dockerBuildCmd, err, stdout, stderr);
+    const logToClient = (message) => {
+      io.emit('build-log', { repoName, message }); 
+    };
 
+    logToClient(`🐳 Building Docker image: ${imageName}`);
+
+    exec(dockerBuildCmd, (err, stdout, stderr) => {
       if (err) {
-        console.error(`❌ Docker build error:\n`, stderr);
+        logToClient(`❌ Docker build failed:\n${stderr}`);
+        const failedLog = new Log({
+          repoName,
+          status: 'Failed',
+          logContent: stderr.toString()
+        });
+        failedLog.save();
         return reject(err);
       }
 
-      console.log(`✅ Docker build successful:\n${stdout}`);
-
+      logToClient(`✅ Docker build successful:\n${stdout}`);
       const dockerRunCmd = `docker run -d ${imageName}`;
-      exec(dockerRunCmd, async (err, stdout, stderr) => {
-        await logStage("docker run", dockerRunCmd, err, stdout, stderr);
-
+      exec(dockerRunCmd, (err, stdout, stderr) => {
         if (err) {
-          console.error(`❌ Error running container:\n`, stderr);
+          logToClient(`❌ Error running container:\n${stderr}`);
+          const failedLog = new Log({
+            repoName,
+            status: 'Failed',
+            logContent: stderr.toString()
+          });
+          failedLog.save();
           return reject(err);
         }
 
         const containerId = stdout.trim();
-        console.log(`🚀 Container started: ${containerId}`);
+        logToClient(`🚀 Container started: ${containerId}`);
 
         const dockerLogsCmd = `docker logs -f ${containerId}`;
         const logsProcess = exec(dockerLogsCmd);
@@ -49,16 +48,31 @@ async function buildDockerImage(repoPath, repoName) {
         let collectedLogs = '';
 
         logsProcess.stdout.on('data', (chunk) => {
-          collectedLogs += chunk.toString();
+          const data = chunk.toString();
+          collectedLogs += data;
+          logToClient(data);
         });
 
         logsProcess.stderr.on('data', (chunk) => {
-          collectedLogs += chunk.toString();
+          const data = chunk.toString();
+          collectedLogs += data;
+          logToClient(data);
         });
 
         logsProcess.on('close', async () => {
-          await logStage("container logs", dockerLogsCmd, null, collectedLogs, null);
-          console.log(`📦 Logs saved to database for ${repoName}`);
+          const successLog = new Log({
+            repoName,
+            status: 'Success',
+            logContent: collectedLogs
+          });
+
+          try {
+            await successLog.save();
+            logToClient(`📦 Logs saved to DB for ${repoName}`);
+          } catch (dbErr) {
+            logToClient('❌ Failed to save logs to DB');
+          }
+
           resolve(imageName);
         });
       });
