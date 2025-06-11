@@ -3,6 +3,7 @@ const Log = require('./models/Logs');
 const { io } = require('./socket'); // import socket instance
 
 async function buildDockerImage(repoPath, repoName) {
+  console.log("sasi gudda")
   const imageName = `student-${repoName.toLowerCase()}`;
   const dockerBuildCmd = `docker build -t ${imageName} ${repoPath}`;
 

@@ -1,4 +1,6 @@
 const express = require("express");
+const http = require("http"); // Add this
+const { Server } = require("socket.io"); // Add this
 const cloneRepo = require("./cloneRepo");
 const buildDockerImage = require("./buildDockerImage");
 const createK8sJob = require("./createK8sJob");
@@ -7,8 +9,18 @@ const path = require("path");
 const Log = require("./models/Logs");
 const cors = require("cors");
 const { connectToMongo } = require("./database/connectDB");
+const authRoutes = require("./routes/auth")
+const dashboardRoutes = require("./routes/dashboard")
 
 const app = express();
+const server = http.createServer(app); // Use http server
+const io = new Server(server, {
+  cors: {
+    origin: "*", // Adjust as needed
+    methods: ["GET", "POST"],
+  },
+});
+
 app.use(express.json());
 app.use(cors());
 
@@ -19,6 +31,19 @@ const logsDir = path.resolve(__dirname, "../logs");
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir);
 }
+
+
+app.use('/api/auth',authRoutes)
+app.use('/api/dashboard',dashboardRoutes)
+
+// Socket.IO connection
+// io.on("connection", (socket) => {
+//   console.log("🔌 New client connected:", socket.id);
+
+//   socket.on("disconnect", () => {
+//     console.log("🔌 Client disconnected:", socket.id);
+//   });
+// });
 
 app.get("/repos", (req, res) => {
   const reposDir = path.resolve(__dirname, "../repos");
@@ -68,6 +93,6 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-app.listen(8080, () => {
-  console.log("🚀 Server listening on port 3000");
+server.listen(8080, () => {
+  console.log("🚀 Server listening on port 8080");
 });
