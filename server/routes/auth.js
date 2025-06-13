@@ -7,9 +7,9 @@ const router = express.Router();
 const SECRET = 'ci_cd_jwt_secret_key';
 
 router.post('/register', async (req, res) => {
-  const { username, password } = req.body;
+  const { username, email, password } = req.body;
   const hash = await bcrypt.hash(password, 10);
-  const newUser = new User({ username, password: hash });
+  const newUser = new User({ username, email,  password: hash });
   await newUser.save();
   res.send('User registered!');
 });
