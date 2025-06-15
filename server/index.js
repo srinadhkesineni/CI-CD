@@ -1,6 +1,6 @@
 const express = require("express");
-const http = require("http"); // Add this
-const { Server } = require("socket.io"); // Add this
+const http = require("http");
+const { Server } = require("socket.io");
 const cloneRepo = require("./cloneRepo");
 const buildDockerImage = require("./buildDockerImage");
 const createK8sJob = require("./createK8sJob");
@@ -9,87 +9,108 @@ const path = require("path");
 const Log = require("./models/Logs");
 const cors = require("cors");
 const { connectToMongo } = require("./database/connectDB");
-const authRoutes = require("./routes/auth")
-const dashboardRoutes = require("./routes/dashboard")
+const authRoutes = require("./routes/auth");
+const authMiddleware = require("./middleware/auth");
+const repoRoutes = require("./routes/repo");
+const Repo = require("./models/Repo");
 
 const app = express();
-const server = http.createServer(app); // Use http server
+const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*", // Adjust as needed
+    origin: "*",
     methods: ["GET", "POST"],
   },
 });
+
+// Store io globally to use in buildDockerImage
+global._io = io;
 
 app.use(express.json());
 app.use(cors());
 
 connectToMongo();
 
-// ✅ Ensure logs folder exists at startup
 const logsDir = path.resolve(__dirname, "../logs");
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir);
 }
 
+// Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/repo", repoRoutes);
 
-app.use('/api/auth',authRoutes)
-app.use('/api/dashboard',dashboardRoutes)
+app.get("/repos", authMiddleware, async (req, res) => {
+  try {
+    const logs = await Log.find({ user: req.user.id }).sort({ timestamp: -1 });
 
-// Socket.IO connection
-// io.on("connection", (socket) => {
-//   console.log("🔌 New client connected:", socket.id);
+    // Map logs to unique repo names
+    const uniqueRepos = {};
+    logs.forEach((log) => {
+      if (!uniqueRepos[log.repoName]) {
+        uniqueRepos[log.repoName] = {
+          name: log.repoName,
+          commit: "N/A",
+          status: log.status,
+          logsLink: `/logs/${log.repoName}`,
+        };
+      }
+    });
 
-//   socket.on("disconnect", () => {
-//     console.log("🔌 Client disconnected:", socket.id);
-//   });
-// });
-
-app.get("/repos", (req, res) => {
-  const reposDir = path.resolve(__dirname, "../repos");
-
-  fs.readdir(reposDir, (err, folders) => {
-    if (err) {
-      console.error("❌ Error reading repos folder:", err);
-      return res.status(500).json({ error: "Failed to read repos" });
-    }
-
-    const repoData = folders.map((folder) => ({
-      name: folder,
-      commit: "N/A",
-      status: "Unknown",
-      logsLink: `/logs/${folder}`,
-    }));
-
-    res.json(repoData);
-  });
+    res.json(Object.values(uniqueRepos));
+  } catch (err) {
+    console.error("❌ Error fetching user repos:", err);
+    res.status(500).json({ error: "Failed to fetch repos" });
+  }
 });
 
-app.get("/logs/:repoName", async (req, res) => {
+app.get("/logs/:repoName", authMiddleware, async (req, res) => {
   try {
-    const logs = await Log.find({ repoName: req.params.repoName }).sort({
-      timestamp: -1,
+    const logs = await Log.find({
+      repoName: req.params.repoName,
+      user: req.user.id,
+    }).sort({ timestamp: -1 });
+
+    if (!logs.length) {
+      return res.status(404).send("No logs found.");
+    }
+
+    const allLogs = logs.map((log, index) => {
+      return `📝 Log #${logs.length - index} (Status: ${log.status})\n${log.logContent}\n\n------------------\n`;
     });
-    res.send(logs.length ? logs[0].logContent : "No logs found.");
+
+    res.send(allLogs.join(''));
   } catch (err) {
     res.status(500).send("❌ Failed to fetch logs.");
   }
 });
 
+
 app.post("/webhook", async (req, res) => {
   const repoUrl = req.body.repository.clone_url;
   const repoName = req.body.repository.name;
-  const jobName = `test-job-${Date.now()}`;
 
   try {
-    const repoPath = await cloneRepo(repoUrl, repoName);
-    const imageName = await buildDockerImage(repoPath, repoName);
-    // await createK8sJob(imageName, jobName);
+    const linkedRepo = await Repo.findOne({ repoUrl });
+    console.log("linked repos : ", linkedRepo);
+    if (!linkedRepo) {
+      return res.status(404).send("❌ Repo not linked to any user");
+    }
 
-    res.status(200).send("✅ Test job created successfully!");
-  } catch (error) {
-    console.error("❌ Error in webhook processing:", error);
-    res.status(500).send("❌ Error creating test job.");
+    const userId = linkedRepo.user;
+
+    const repoPath = await cloneRepo(repoUrl, repoName);
+    try {
+      await buildDockerImage(repoPath, repoName, userId);
+      console.log("✅ Image built");
+    } catch (err) {
+      console.error("❌ Build error", err);
+    }
+
+    res.status(200).send("✅ Build triggered!");
+  } catch (err) {
+    console.error("Webhook Error:", err);
+    res.status(500).send("❌ Internal Server Error");
   }
 });
 

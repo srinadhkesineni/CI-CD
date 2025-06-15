@@ -4,12 +4,14 @@ import Logs from "./pages/Logs";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
+import LinkRepo from "./pages/LinkRepo";
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/addrepo" element={<LinkRepo />} />
         <Route path="/signup" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<Home />} />
