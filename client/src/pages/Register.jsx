@@ -11,7 +11,7 @@ export default function Register() {
 
   const handleRegister = async () => {
     try {
-      await axios.post("http://localhost:8080/api/auth/register", {
+      await axios.post(  `${process.env.REACT_APP_API_BASE}/api/auth/register`, {
         username,
         email,
         password,

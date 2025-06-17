@@ -10,7 +10,7 @@ export default function Login() {
 
   const handleLogin = async () => {
     try {
-      const res = await axios.post('http://localhost:8080/api/auth/login', {
+      const res = await axios.post(`${process.env.REACT_APP_API_BASE}/api/auth/login`, {
         username,
         password,
       });

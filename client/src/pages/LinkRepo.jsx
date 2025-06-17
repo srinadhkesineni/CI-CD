@@ -11,7 +11,7 @@ export default function LinkRepo() {
 
     try {
       const response = await axios.post(
-        "http://localhost:8080/api/repo/link",
+        `${process.env.REACT_APP_API_BASE}/api/repo/link`,
         { repoName, repoUrl },
         {
           headers: {
