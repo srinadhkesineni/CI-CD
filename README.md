@@ -13,7 +13,6 @@ This project implements a simple CI/CD system that automatically:
 - **Database**: MongoDB
 - **Docker**: For containerized builds and tests
 - **JWT**: For user authentication
-- **Socket.IO (optional)**: For real-time log streaming *(commented out for now)*
 
 ---
 
