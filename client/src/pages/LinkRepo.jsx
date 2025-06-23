@@ -11,7 +11,7 @@ export default function LinkRepo() {
 
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_API_BASE}/api/repo/link`,
+        "https://ci-cd-backend-2zmd.onrender.com/api/repo/link",
         { repoName, repoUrl },
         {
           headers: {

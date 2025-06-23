@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8080';
+const API_BASE = "https://ci-cd-backend-2zmd.onrender.com";
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('token');
